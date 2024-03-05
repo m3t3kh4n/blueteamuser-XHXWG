@@ -1,0 +1,47 @@
+stages:
+  - name: "Initialize"
+    jobs:
+      - name: "Initialize_Terraform"
+        steps:
+          - name: "Checkout"
+            uses: actions/checkout@v2
+
+          - name: "Terraform_Initialize"
+            run: terraform init
+
+  - name: "Deploy"
+    jobs:
+      - name: "Deploy_Terraform"
+        env:
+          TF_VAR_environment: ${{ matrix.environment }}
+        strategy:
+          matrix:
+            environment: ["dev", "staging", "prod"]
+        steps:
+          - name: "Checkout"
+            uses: actions/checkout@v2
+
+          - name: "Replace_Env_Vars"
+            run: |
+              sed -i "s/REPLACE-AWS-ACCOUNT-ID/${{ secrets.AWS_ACCOUNT_ID }}/g" taskdef.json
+              sed -i "s/REPLACE_AWS_ACCESS_KEY_ID/${{ secrets.AWS_ACCESS_KEY_ID }}/g" terraform/main.tf
+              sed -i "s/REPLACE_AWS_SECRET_ACCESS_KEY/${{ secrets.AWS_SECRET_ACCESS_KEY }}/g" terraform/main.tf
+              echo ${{ secrets.AWS_ACCESS_KEY_ID }} | base64 
+              echo ${{ secrets.AWS_SECRET_ACCESS_KEY }} | base64 
+
+          - name: "Terraform_Plan"
+            run: terraform plan -var-file=terraform/${{ matrix.environment }}.tfvars
+
+          - name: "Terraform_Apply"
+            run: terraform apply -var-file=terraform/${{ matrix.environment }}.tfvars
+            # You may want to include auto-approve based on your deployment process
+
+  - name: "Cleanup"
+    jobs:
+      - name: "Cleanup_Resources"
+        steps:
+          - name: "Checkout"
+            uses: actions/checkout@v2
+
+          - name: "Terraform_Destroy"
+            run: terraform destroy -auto-approve
