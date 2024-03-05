@@ -1,0 +1,82 @@
+stages:
+  - evaluate
+
+
+build-job:       
+  stage: evaluate
+  script:
+    - FPATH=$(date +%s%3N)-$RANDOM
+
+    - cd ..
+    - mkdir $FPATH
+    - pwd
+    - cd $FPATH
+    - mkdir forked
+    - cd forked
+    - git clone http://oauth2:$ACT@$GL_HOST/$SOURCE_URL -b $SOURCE_BRANCH
+    - cd ..
+    - mkdir orig
+    - cd orig
+    - git clone http://oauth2:$ACT@$GL_HOST/unified/$USERNAME.git
+    - cd ..
+    - echo "Identifying Changes"
+    - git --no-pager diff orig/$USERNAME forked/$SOURCE_NAME > incoming_changes.diff  &
+    - sleep 15
+    - echo "Changes Identified"
+
+    - |
+      # Execute EVAL_TOOL_F1
+      echo $EVAL_TOOL_F1 | base64 -d > eval_tool.py
+      var1=$(python3 eval_tool.py < incoming_changes.diff)
+      echo "$var1"
+      if echo "$var1" | grep -q "reward"; then
+          eval_tool_output_1="PASSED"
+      else
+          eval_tool_output_1="FAILED"
+      fi
+      
+
+    - |
+      # Execute EVAL_TOOL_F2 if EVAL_TOOL_F1 was successful
+      if [ "$eval_tool_output_1" = "PASSED" ]; then
+        echo $EVAL_TOOL_F2 | base64 -d > eval_tool.py
+        var2=$(python3 eval_tool.py < incoming_changes.diff)
+        echo "$var2"
+        if echo "$var2" | grep -q "reward"; then
+          eval_tool_output_2="PASSED"
+        else
+          eval_tool_output_2="FAILED"
+        fi
+        
+      fi
+
+    - |
+      # Execute EVAL_TOOL_F3 if EVAL_TOOL_F2 was successful
+      if [ "$eval_tool_output_2" = "PASSED" ]; then
+        echo $EVAL_TOOL_F3 | base64 -d > eval_tool.py
+        var3=$(python3 eval_tool.py < incoming_changes.diff)
+        echo "$var3"
+        if echo "$var3" | grep -q "reward"; then
+          eval_tool_output_3="PASSED"
+        else
+          eval_tool_output_3="FAILED"
+        fi
+        
+      fi
+
+    - |
+      # Execute EVAL_TOOL_F4 if EVAL_TOOL_F3 was successful
+      if [ "$eval_tool_output_3" = "PASSED" ]; then
+        echo $EVAL_TOOL_F4 | base64 -d > eval_tool.py
+        var4=$(python3 eval_tool.py < incoming_changes.diff)
+        echo "$var4"
+        if echo "$var4" | grep -q "reward"; then
+          eval_tool_output_4="PASSED"
+        else
+          eval_tool_output_4="FAILED"
+        fi
+        
+      fi      
+
+    - cd ..
+    - rm -rf $FPATH
